@@ -80,12 +80,12 @@ public final class TracerTest extends TestBase {
         assertThat(observedSpans)
                 .extracting(Span::getOperation)
                 .containsExactly(
-                        "OkHttp: acquire-limiter-enqueue",
-                        "OkHttp: acquire-limiter-run",
-                        "ignored-span",
-                        "OkHttp: execute-enqueue",
-                        "OkHttp: GET /{param}",
-                        "OkHttp: execute-run");
+                        "OkHttp: acquire-limiter-enqueue", // measures the client-side concurrency limiter
+                        "OkHttp: acquire-limiter-run",     // TODO(someone): delete this somehow, it's pretty much zero
+                        "ignored",                         // TODO(someone): delete this somehow, it's pretty much zero
+                        "OkHttp: execute-enqueue",         // measures the okhttp dispatcher pool
+                        "OkHttp: GET /{param}",            // measures the network request as closely as possible
+                        "OkHttp: execute-run");            // measures all interceptors after the request was received
 
         RecordedRequest request = server.takeRequest();
         assertThat(request.getHeader(TraceHttpHeaders.TRACE_ID)).isEqualTo(traceId);

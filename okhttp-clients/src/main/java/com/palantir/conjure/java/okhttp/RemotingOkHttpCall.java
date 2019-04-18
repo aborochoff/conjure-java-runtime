@@ -156,19 +156,28 @@ final class RemotingOkHttpCall extends ForwardingCall {
 
     @Override
     public void enqueue(Callback callback) {
-        AsyncTracer tracer = new AsyncTracer("OkHttp: acquire-limiter");
+        AsyncTracer tracer = new AsyncTracer("OkHttp: acquire-limiter"); // start 'acquire-limiter-enqueue'
+
         ListenableFuture<Limiter.Listener> limiterListener = limiter.acquire();
         request().tag(ConcurrencyLimiterListener.class).setLimiterListener(limiterListener);
+
         Futures.addCallback(limiterListener, new FutureCallback<Limiter.Listener>() {
             @Override
             public void onSuccess(Limiter.Listener listener) {
+                // tracer.withTrace completes the 'acquire-limiter-enqueue'
+                // tracer.withTrace starts the 'acquire-limiter-run' span
                 tracer.withTrace(() -> {
-                    // terminate acquire-limiter-run span
+
+                    // we don't want 'Okhttp: execute' to be parented to the 'acquire-limiter-run' span, so we throw
+                    // it away
                     Tracer.fastCompleteSpan();
+
                     request().tag(AsyncTracerTag.class).setAsyncTracer(new AsyncTracer("OkHttp: execute"));
                     enqueueInternal(callback);
-                    // Need to recreate a span to make sure withTrace will not close parent spans
-                    Tracer.startSpan("ignored-span");
+
+                    // Create another throwaway span because withTrace will close something, and we want to keep the
+                    // parent span
+                    Tracer.startSpan("ignored");
                     return null;
                 });
             }
